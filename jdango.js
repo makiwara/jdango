@@ -1,10 +1,19 @@
+/*  *****************************************
+    *                                       *
+    *       Jdango v.0.2                    *
+    *                                       *
+    ***************************************** */
+
+
 (function($){
+    
 	function trim(s) { return s.replace(/^\s+/, '').replace(/\s+$/, '')}
 	function undef(s) { return s }
 	
 	$.tpl = {
 		templateQueryPrefix : 'SCRIPT#',
 		templateUrlPrefix : '/static/jdango/templates/',
+		libraryUrlPrefix : '/static/jdango/libs/',
 		javascriptControlStructures : true,
 		precompilerSeparator : '\xA3', // '%#@!@#%',
 		variableSeparator: '\xA2',
@@ -14,17 +23,24 @@
 		blockEnd : /endblock/,
 		extendsRe : /extends\s+"([^""]+)"/,
 		includeRe : /include\s+"([^""]+)"/,
+        loadRe    : /load\s+"([^""]+)"/,
 		forStart : /for\s+([^ ]+)\s+in\s+([^ ]+)/,
 		forEnd : /endfor/,
+		legoIncludeRe     : /^b-([^_]*)(_([^_]*)_(.*))?$/,
+		legoBlocksPrefix  : '../blocks/',
+		legoLoadRe        : /^b-([^_\/]*)(_([^_\/]*)_([^\/]*))?(\/.*)?$/,
+		
 		init : function(params, callback)
 		{
 			if (params["cache"] != undef()) this.cache = params["cache"];
-			if (params["url"] != undef()) this.templateUrlPrefix = params["url"];
+			if (params["url"]   != undef()) this.templateUrlPrefix = params["url"];
+			if (params["lego"]  != undef()) this.legoBlocksPrefix = params["lego"];
+			if (params["libs"]  != undef()) this.libraryUrlPrefix = params["libs"];
 			this.params = params;
 			if (params["precompile"] != undef()) 
 				this.precompile(params["precompile"], 0, callback);
 			else
-			 	callback(tpl);
+			 	callback(this);
 		},
 		precompile : function(templates, index, callback)
 		{
@@ -36,7 +52,7 @@
 		},
 		put : function(template, ctx, target, callback)
 		{
-			this.render(template, ctx, function(result){ $(target).html(result); if (callback) callback()});
+			this.render(template, ctx, function(result){ $(target).html(result); if (callback) callback() });
 		},
 		render : function(template, ctx, callback)
 		{
@@ -52,11 +68,31 @@
 			var done = false;
 			var that = this;
 			var c = function(content) { that.compile_content(template, content, callback); }
-			$(this.templateQueryPrefix+template).each(function(){ done=true; c(this.innerHTML); });
+			$(this.templateQueryPrefix+template).each(function(){ done=true; if (!done) c(this.innerHTML); });
 			if (!done) $.get(this.templateUrlPrefix+template, function(result){ c(result); });
 		},
 		compile_content : function(template, content, callback)
 		{
+		    var that = this;
+		    var dependancies = [];
+		    var scripts = [];
+		    var compile_deps = function(deps)
+		    {
+		        if (deps.length == 0) 
+		            that._loadJs(scripts, callback);
+		        else
+    		        that.compile(deps[0], function(error) {
+        		        if (error) return callback(error);
+        		        deps.shift();
+        		        compile_deps(deps);
+    		        })
+		    }
+		    var add_deps = function(template) { dependancies[dependancies.length] = template }
+		    var finalize = function()
+		    {
+				that.cache[template] = eval(that.cache_eval[template]); 
+				compile_deps(dependancies);
+		    }
 			var parent = false;
 			var c2 = content.replace(/(\{%)|(%})/g, this.precompileSeparator); 
 			var c = c2.split(this.precompileSeparator);
@@ -120,10 +156,32 @@
 				m = this.includeRe.exec(trimmed);
 				if (m)
 				{
-					// TODO add closures to precompile
-					c[i] = '_+=tpl.cache["'+m[1]+'"](tpl, ctx)';
+				    var include_template = m[1];
+				    var lego_m = this.legoIncludeRe.exec(m[1]);
+				    if (lego_m)
+				    {
+				        this._loadCss([this.templateUrlPrefix+this.legoBlocksPrefix + m[1] + "/" + m[1] + ".css"]);
+				        include_template = this.legoBlocksPrefix + m[1] + "/" + m[1] + ".html";
+				    }
+				    add_deps(include_template);
+					c[i] = '_+=tpl.cache["'+include_template+'"](tpl, ctx);';
 					continue;
 				} 
+                m = this.loadRe.exec(trimmed);
+                if (m)
+                {
+                    var load_url = this.libraryUrlPrefix + m[1];
+				    var lego_m = this.legoLoadRe.exec(m[1]);
+				    if (lego_m)
+				    {
+				        load_url = this.templateUrlPrefix+this.legoBlocksPrefix + m[1];
+				        if (!lego_m[5]) 
+				            load_url += "/" + m[1]+".js";
+				    }
+                    scripts[scripts.length] = load_url;
+                    c[i] = "";
+                    continue;
+                } 
 				// for not implemented tags - assume it javascript or mark as missed match
 				if (!this.javascriptControlStructures)
 					c[i] = '/* {% '+c[i]+' %} */ _+="{! '+c[i].replace(/\\/g, "\\\\").replace(/"/g, "\\\"")+' !}";';
@@ -132,11 +190,10 @@
 			if (parent === false) parent = $(this.templateQueryPrefix+template).attr('parent');
 			if (parent)
 			{
-				var that=this;
 				if (this.cache[parent] == undef()) 
 				{
 					this.compile(parent, function(error){
-						if (error) callback(error);
+						if (error) return callback(error);
 						if (that.cache_eval[parent] == undef()) 
 						{
 							that.cache[template] = function(tpl,ctx){ return "{! inherited from closed source template !}" };
@@ -149,53 +206,69 @@
 							var re = new RegExp("/\\*block "+bc[0]+"\\*/(.|\\n)*/\\*endblock "+bc[0]+"\\*/");
 							that.cache_eval[template] = that.cache_eval[template].replace(re, c.splice(bc[1], bc[2]-bc[1]+1).join(' '));
 						}
-						that.cache[template] = eval(that.cache_eval[template]); // nb: this line is duplicated below
-						callback();
+						finalize();
 					});
 					return;
 				}
 			}
 			else
 				this.cache_eval[template] = 't = function(tpl, ctx){ var _=""; '+c.join(' ')+' return _; }';
-			this.cache[template] = eval(this.cache_eval[template]); // nb: this line is duplicated above
-			callback();
+			finalize();
 		},
-		cache : {}, cache_eval : {}
+		cache : {}, cache_eval : {},
+		
+        _css : {},
+		_loadCss : function( urls )
+        {
+            for (var i=0; i<urls.length; i++)
+                if (!this._css[urls[i]])
+                    {
+                        this._css[urls[i]] = true;
+                        var newSS=document.createElement('link');
+                        newSS.rel='stylesheet';
+                        newSS.href=urls[i];
+                        document.getElementsByTagName("head")[0].appendChild(newSS);
+                    }
+        },
+        scripts : {},
+        _loadJs : function( scripts, callback )
+        {
+            var i=0;
+            var that = this;
+            var next = function(callback_queue_url)
+            {
+                if (callback_queue_url != undef() && that.scripts[callback_queue_url] != "loaded")
+                {
+                    for (var j=0; j<that.scripts[callback_queue_url].length; j++)
+                        that.scripts[callback_queue_url][j]()
+                    that.scripts[callback_queue_url] = "loaded";
+                }
+                if (i>= scripts.length) 
+                {
+                    if (callback != undef()) callback();
+                    return;
+                }
+                var s = scripts[i]; i++;
+                if (that.scripts[s] == undef() && s != false)
+                {
+                    that.scripts[s] = [];
+                    $.getScript(s, (function(s) {
+                        return function() {
+                            next(s);
+                        }
+                    })(s));
+                }
+                else 
+                {
+                    if (that.scripts[s] === "loaded") 
+                        next();
+                    else
+                        that.scripts[s].push(next);
+                }
+            }
+            next();
+        }
+        
 	};
 	
-	this.test_cache = {
-		'parent' : function(tpl, ctx){ 
-				var _='';
-				_+='<div><strong>';
-				/*block title*/
-				_+='Parent';
-				/*endblock title*/
-				_+=ctx['template_id'];
-				_+='</strong></div>';
-				return _;
-			},
-		'child' : function(tpl, data){
-				var _='';
-				_+='<div><strong>';
-				/*block title*/
-				_+='Child';
-				/*endblock title*/
-				_+=data['template_id'];
-				_+='</strong></div>';
-				return _;
-			}
-	}
 })(jQuery);
-
-/*
-templates test cache was generated of:
-<SCRIPT type="text/html" id="parent">
-<div>
-	<strong>{% block title %}Parent{% endblock %}: {{template_id}}</strong>
-</div>
-</SCRIPT>
-
-<SCRIPT type="text/html" id="child" parent="parent">
-{% block title %}Child{% endblock %}
-</SCRIPT>
-*/
