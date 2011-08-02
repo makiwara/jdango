@@ -30,6 +30,9 @@
 		legoBlocksPrefix  : '../blocks/',
 		legoLoadRe        : /^b-([^_\/]*)(_([^_\/]*)_([^\/]*))?(\/.*)?$/,
 		
+		includeParamsRe  : /include\s+"([^""]+)"((\s+([a-zA-Z0-9_]+)\s*=(\s*([a-zA-Z0-9\.]+)|("[^"]*")|('[^']*')))+)/,
+		includeParams1Re : /^\s+([a-zA-Z0-9_]+)\s*=(\s*([a-zA-Z0-9\.]+)|("[^"]*")|('[^']*'))/,
+		
 		init : function(params, callback)
 		{
 			if (params["cache"] != undef()) this.cache = params["cache"];
@@ -164,7 +167,36 @@
 				        include_template = this.legoBlocksPrefix + m[1] + "/" + m[1] + ".html";
 				    }
 				    add_deps(include_template);
-					c[i] = '_+=tpl.cache["'+include_template+'"](tpl, ctx);';
+				    // todo parse params
+				    var params_m = this.includeParamsRe(trimmed);
+				    var ctx;
+				    if (params_m)
+				    {
+				        var keys = {};
+				        var values = {};
+				        var params = params_m[2];
+				        while (true)
+				        {
+				            var params_m1 = this.includeParams1Re(params);
+				            if (params_m1)
+				            {
+				                params = params.substr(params_m1[0].length);
+				                if (params_m1[3])
+				                    keys['"'+params_m1[1]+'"'] = '"'+params_m1[2]+'"';
+				                else
+			                        values['"'+params_m1[1]+'"'] = params_m1[2];
+				            } 
+				            else break;
+				        }
+				        var joined_keys = [];
+				        for (var x in keys) joined_keys[joined_keys.length] = x+":"+keys[x];
+				        var joined_values = [];
+				        for (var x in values) joined_values[joined_values.length] = x+":"+values[x];
+				        ctx = 'tpl.CTX(ctx, { keys: {'+joined_keys+'}, values:{'+joined_values+'}})';
+				    }
+				    else
+				        ctx = 'ctx';
+					c[i] = '_+=tpl.cache["'+include_template+'"](tpl, '+ctx+');';
 					continue;
 				} 
                 m = this.loadRe.exec(trimmed);
@@ -267,6 +299,22 @@
                 }
             }
             next();
+        },
+        
+        CTX : function( ctx, kv )
+        {// this function enhances ctx with kv{keys, values}, where keys means =ctx[keys[k]] 
+            var ctx2 = {};
+            for (var k in ctx)
+                ctx2[k] = ctx[k];
+            for (var k in kv["keys"])
+            {
+                var tt = 't=ctx["'+kv["keys"][k].split(".").join('"]["')+'"]';
+                var tt = eval(tt);
+                ctx2[k] = t;
+            }
+            for (var k in kv["values"])
+                ctx2[k] = kv["values"][k];
+            return ctx2;
         }
         
 	};
