@@ -1,13 +1,13 @@
 <html>
 <head>
 	<meta http-equiv="Content-type" content="text/html; charset=utf-8">
-	<title>JS inheritance templating test</title>
-	<script type="text/javascript" charset="utf-8" src="/static/jquery.js"></script>
-	<script type="text/javascript" charset="utf-8" src="/static/jdango/jdango.js"></script>
+	<title>jdango v.0.1: JS inheritance templating test</title>
+	<script type="text/javascript" charset="utf-8" src="jquery.js"></script>
+	<script type="text/javascript" charset="utf-8" src="jdango.js"></script>
 	<script type="text/javascript" charset="utf-8">
 	(function(){
 		$(function(){
-			$.tpl.init({ url:"/static/jdango/templates/", precompile: [/*templates to precompile*/] }, function(tpl){
+			$.tpl.init({ url:"templates/", precompile: [/*templates to precompile*/] }, function(tpl){
 				tpl.put('child.html', {template_id:123, amount:10}, '.target')
 			});
 		})
