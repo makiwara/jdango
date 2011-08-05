@@ -1,6 +1,6 @@
 /*  *****************************************
     *                                       *
-    *       Jdango v.0.2                    *
+    *       Jdango v.0.3                    *
     *                                       *
     ***************************************** */
 
@@ -34,6 +34,10 @@
 		legoBlocksRe      : /^b-([^_\/]*)(_([^_\/]*)_([^\/]*))?(\/.*)?$/,
 		extendsAsteriskRe : /\{\{\*\}\}/g,
 		
+		templateStart : /template\s+([^ ]+)/,
+		templateEnd : /endtemplate/,
+		templateRe  : /\{\%\s*template\s+([^ ]+)\s*\%\}((.|\n)+?)\{\%\s*endtemplate\s*\%\}/,
+		templatePathRe : /^(.*\.html).+$/,
 
 		
 		includeParamsRe  : /include\s+"([^""]+)"((\s+([a-zA-Z0-9_]+)\s*=(\s*([a-zA-Z0-9\.]+)|("[^"]*")|('[^']*')))+)/,
@@ -80,6 +84,7 @@
 			$(this.templateQueryPrefix+template).each(function(){ done=true; if (!done) c(this.innerHTML); });
 			if (!done)
 			{
+			    var template = template.replace(that.templatePathRe, '$1');
     			var path = this.expand_path(template, this.templateUrlPrefix, ".html");
 			    $.get(path, function(result){ c(result); });
 			}
@@ -87,11 +92,25 @@
 		compile_content : function(template, content, callback)
 		{
 		    var that = this;
+		    // first of all, remove all templates and push them in deps
+		    var inner_templates = this.remove_templates(content);
+		    content = inner_templates.content;
+		    var compile_inner = function(templates)
+		    {
+		        if (templates.length == 0) 
+		            compile_deps(dependancies);
+		        else
+    		        that.compile_content(template+"/"+templates[0]["name"], templates[0]["content"], function(error) {
+        		        if (error) return callback(error);
+        		        templates.shift();
+        		        compile_inner(templates);
+    		        })
+		    }
 		    var dependancies = [];
 		    var scripts = [];
 		    var compile_deps = function(deps)
 		    {
-		        if (deps.length == 0) 
+		        if (deps.length == 0)
 		            that._loadJs(scripts, callback);
 		        else
     		        that.compile(deps[0], function(error) {
@@ -104,7 +123,7 @@
 		    var finalize = function()
 		    {
 				that.cache[template] = eval(that.cache_eval[template]); 
-				compile_deps(dependancies);
+				compile_inner(inner_templates.templates);
 		    }
 			var parent = false;
 			var c2 = content.replace(/(\{%)|(%})/g, this.precompileSeparator); 
@@ -323,6 +342,19 @@
 	        }
 	        if (default_postfix == ".css") return false;
 	        else return default_prefix + path;
+        },
+        
+        remove_templates : function( content )
+        {
+            var templates = [];
+            while (true)
+            {
+                var m = this.templateRe.exec(content);
+                if (!m) break;
+                templates[ templates.length] = { name:m[1], content:m[2] };
+                content = content.substr(this.templateRe.lastIndex+m[0].length);
+            }
+            return { content: content, templates: templates };
         },
         
         CTX : function( ctx, kv )

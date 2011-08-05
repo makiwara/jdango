@@ -1,7 +1,7 @@
 <html>
 <head>
 	<meta http-equiv="Content-type" content="text/html; charset=utf-8">
-	<title>jdango v.0.3: simplification of lego-block inheritance</title>
+	<title>jdango v.0.3: simplification of lego-block inheritance and multi-templates</title>
 	<script type="text/javascript" charset="utf-8" src="jquery.js"></script>
 	<script type="text/javascript" charset="utf-8" src="jdango.js"></script>
 	<script type="text/javascript" charset="utf-8">
@@ -32,7 +32,16 @@
     + каскадно загружать CSS-файлы блоков при наследовании
     + избавиться от зависимости путей к блокам от пути к шаблонам
 + сделать оператор {{*}}, который означает «начало цепи наследования»
-- сделать много шаблонов в одном файле
++ сделать много шаблонов в одном файле
+    + выработать синтаксис
+        {% template help %}
+        {% endtemplate %}
+        {% include "library.html/help" %}
+    + попатчить бандл для TextMate, чтобы он красиво показывать эту разметку
+    + при попытке компиляции компилировать весь library.html
+        тогда обработаем все три сценария входа: render/compile, include, extends
+        обнаруживать первое вхождение .html 
+    + при рендеринге обнаруживать вложенные темплейты и компилировать их отдельно
 
 L8R:
 - разрезать код на «серверную» и «клиентскую» части, чтобы уметь прятать шаблоны на сервере
