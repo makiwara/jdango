@@ -7,6 +7,9 @@
 
 (function($){
     
+    function alert(w) { console.log(w)}
+    
+    
 	function trim(s) { return s.replace(/^\s+/, '').replace(/\s+$/, '')}
 	function undef(s) { return s }
 	
@@ -26,9 +29,12 @@
         loadRe    : /load\s+"([^""]+)"/,
 		forStart : /for\s+([^ ]+)\s+in\s+([^ ]+)/,
 		forEnd : /endfor/,
-		legoIncludeRe     : /^b-([^_]*)(_([^_]*)_(.*))?$/,
-		legoBlocksPrefix  : '../blocks/',
-		legoLoadRe        : /^b-([^_\/]*)(_([^_\/]*)_([^\/]*))?(\/.*)?$/,
+
+		legoBlocksPrefix  : '/static/django/blocks/',
+		legoBlocksRe      : /^b-([^_\/]*)(_([^_\/]*)_([^\/]*))?(\/.*)?$/,
+		extendsAsteriskRe : /\{\{\*\}\}/g,
+		
+
 		
 		includeParamsRe  : /include\s+"([^""]+)"((\s+([a-zA-Z0-9_]+)\s*=(\s*([a-zA-Z0-9\.]+)|("[^"]*")|('[^']*')))+)/,
 		includeParams1Re : /^\s+([a-zA-Z0-9_]+)\s*=(\s*([a-zA-Z0-9\.]+)|("[^"]*")|('[^']*'))/,
@@ -72,7 +78,11 @@
 			var that = this;
 			var c = function(content) { that.compile_content(template, content, callback); }
 			$(this.templateQueryPrefix+template).each(function(){ done=true; if (!done) c(this.innerHTML); });
-			if (!done) $.get(this.templateUrlPrefix+template, function(result){ c(result); });
+			if (!done)
+			{
+    			var path = this.expand_path(template, this.templateUrlPrefix, ".html");
+			    $.get(path, function(result){ c(result); });
+			}
 		},
 		compile_content : function(template, content, callback)
 		{
@@ -103,16 +113,21 @@
 			for (var i=0; i<c.length; i+=2)
 			{
 				// find replaces like {{item.index.key}} -> ctx["item"]["index"]["key"]
-				var t = c[i].replace(this.variable, this.variableSeparator+'$1'+this.variableSeparator);
+				var t = c[i].replace(this.extendsAsteriskRe, this.variableSeparator+this.variableSeparator)
+                            .replace(this.variable, this.variableSeparator+'$1'+this.variableSeparator);
 				t = t.split(this.variableSeparator);
 				for (var j=1; j<t.length; j+=2)
 				{
+				    var replacement;
+				    if (t[j] == "")
+			            replacement = '__asterisk__';
+				    else
+			            replacement = 'ctx['+this.variableSeparator+t[j]+this.variableSeparator+']';
 					t[j] = t[j].split(".").join(this.variableSeparator+"]["+this.variableSeparator);
-					t[j] = this.variableSeparator+
-								'+ctx['+this.variableSeparator+t[j]+this.variableSeparator+']+'+
-						   this.variableSeparator;
+					t[j] = this.variableSeparator+ "+"+replacement+"+" +this.variableSeparator;
 				}
-				c[i] = '_+="'+t.join("").replace(/\\/g, "\\\\").replace(/"/g, "\\\"").replace(this.variableSeparatorRe, '"')
+				c[i] = '_+="'+t.join("").replace(/\\/g, "\\\\").replace(/"/g, "\\\"")
+				        .replace(this.variableSeparatorRe, '"')
 						.replace(/\n/g, "\\n").replace(/\t/g, "\\t").replace(/\r/g, "\\r")+'";';
 			}
 			// 2. detect blocks in 1,3,5,... parts
@@ -159,13 +174,8 @@
 				m = this.includeRe.exec(trimmed);
 				if (m)
 				{
+			        this._loadCss([this.expand_path(m[1], this.legoBlocksPrefix, ".css")])
 				    var include_template = m[1];
-				    var lego_m = this.legoIncludeRe.exec(m[1]);
-				    if (lego_m)
-				    {
-				        this._loadCss([this.templateUrlPrefix+this.legoBlocksPrefix + m[1] + "/" + m[1] + ".css"]);
-				        include_template = this.legoBlocksPrefix + m[1] + "/" + m[1] + ".html";
-				    }
 				    add_deps(include_template);
 				    // todo parse params
 				    var params_m = this.includeParamsRe(trimmed);
@@ -202,15 +212,7 @@
                 m = this.loadRe.exec(trimmed);
                 if (m)
                 {
-                    var load_url = this.libraryUrlPrefix + m[1];
-				    var lego_m = this.legoLoadRe.exec(m[1]);
-				    if (lego_m)
-				    {
-				        load_url = this.templateUrlPrefix+this.legoBlocksPrefix + m[1];
-				        if (!lego_m[5]) 
-				            load_url += "/" + m[1]+".js";
-				    }
-                    scripts[scripts.length] = load_url;
+                    scripts[scripts.length] = this.expand_path(m[1], this.libraryUrlPrefix, ".js");
                     c[i] = "";
                     continue;
                 } 
@@ -224,6 +226,7 @@
 			{
 				if (this.cache[parent] == undef()) 
 				{
+			        this._loadCss([this.expand_path(parent, this.legoBlocksPrefix, ".css")])
 					this.compile(parent, function(error){
 						if (error) return callback(error);
 						if (that.cache_eval[parent] == undef()) 
@@ -232,6 +235,9 @@
 							return;
 						}
 						that.cache_eval[template] = that.cache_eval[parent];
+						that.cache_eval[template] = that.cache_eval[template].replace(
+						        /\/\*asterisk\*\/(.*?)\/\*endasterisk\*\//, 
+						        '/*asterisk*/var __asterisk__="'+template+'";/*endasterisk*/');
 						for (var i=0; i<blockCache.length; i++)
 						{
 							var bc = blockCache[i];
@@ -244,7 +250,7 @@
 				}
 			}
 			else
-				this.cache_eval[template] = 't = function(tpl, ctx){ var _=""; '+c.join(' ')+' return _; }';
+				this.cache_eval[template] = 't = function(tpl, ctx){ /*asterisk*/var __asterisk__="'+template+'";/*endasterisk*/ var _=""; '+c.join(' ')+' return _; }';
 			finalize();
 		},
 		cache : {}, cache_eval : {},
@@ -253,7 +259,7 @@
 		_loadCss : function( urls )
         {
             for (var i=0; i<urls.length; i++)
-                if (!this._css[urls[i]])
+                if (!this._css[urls[i]] && urls[i])
                     {
                         this._css[urls[i]] = true;
                         var newSS=document.createElement('link');
@@ -299,6 +305,24 @@
                 }
             }
             next();
+        },
+        
+        expand_path : function( path, default_prefix, default_postfix )
+        {// this function expands "b-XXX" and "b-XXX/YYY.html" into full path
+            // "b-XXX", ".html" -> "lego/b-XXX/b-XXX"
+            // "b-YYY/YYY.js" -> "lego/b-YYY/YYY.js"
+            // "some.html" -> "templates/some.html"
+	        var lego_m = this.legoBlocksRe.exec(path);
+	        var result = path;
+	        if (lego_m)
+		    {
+		        var result = this.legoBlocksPrefix + path;
+		        if (!lego_m[5]) 
+		            result += "/" + path + default_postfix;
+	            return result;
+	        }
+	        if (default_postfix == ".css") return false;
+	        else return default_prefix + path;
         },
         
         CTX : function( ctx, kv )

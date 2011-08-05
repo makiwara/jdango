@@ -1,1 +1,6 @@
-<input type="button" class="b-button" style="color:{{color}}" value="{{title}}" />
+<input type="button" class="b-button" 
+    {% block style %}
+        style="color:{{color}}" 
+    {% endblock %}
+    value="{{title}}" /> 
+    {{*}}

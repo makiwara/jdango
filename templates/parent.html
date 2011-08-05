@@ -1,8 +1,8 @@
 <div>
-	<strong>{% block title %}Parent{% endblock %}: {{template_id}}</strong>
+	<strong>{% block title %}Parent{% endblock %}: {{template_id}}, {{*}}</strong>
 	{% for (var i=0; i<ctx['amount']; i++) { %}
 		<div>№ {% _+=i; %}.</div>
 	{% } %}
-	{% include "b-button" title="Это кнопка" color=colors.text %}
+	{% include "b-button-2" title="Это кнопка" color=colors.text %}
 	{% include "b-input" %}
 </div>
