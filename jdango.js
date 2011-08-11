@@ -86,7 +86,7 @@
 			{
 			    var template = template.replace(that.templatePathRe, '$1');
     			var path = this.expand_path(template, this.templateUrlPrefix, ".html");
-			    $.get(path, function(result){ c(result); });
+			    $.get(path, function(result){ c(result); }, "html");
 			}
 		},
 		compile_content : function(template, content, callback)
