@@ -141,8 +141,10 @@
 				    if (t[j] == "")
 			            replacement = '__asterisk__';
 				    else
+				    {
 			            replacement = 'ctx['+this.variableSeparator+t[j]+this.variableSeparator+']';
-					t[j] = t[j].split(".").join(this.variableSeparator+"]["+this.variableSeparator);
+					    replacement = replacement.split(".").join(this.variableSeparator+"]["+this.variableSeparator);
+					}
 					t[j] = this.variableSeparator+ "+"+replacement+"+" +this.variableSeparator;
 				}
 				c[i] = '_+="'+t.join("").replace(/\\/g, "\\\\").replace(/"/g, "\\\"")
