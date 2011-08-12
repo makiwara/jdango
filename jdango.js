@@ -21,7 +21,7 @@
 		precompileSeparator : '\xA3', // '%#@!@#%',
 		variableSeparator: '\xA2',
 		variableSeparatorRe: /\xA2/g,
-		variable : /\{\{\s*(\S+)\s*\}\}/g,
+		variable : /\{\{\s*(\S+?)\s*\}\}/g,
 		blockStart : /block\s+([^ ]+)/,
 		blockEnd : /endblock/,
 		extendsRe : /extends\s+"([^""]+)"/,
