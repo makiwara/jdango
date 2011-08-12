@@ -18,7 +18,7 @@
 		templateUrlPrefix : '/static/jdango/templates/',
 		libraryUrlPrefix : '/static/jdango/libs/',
 		javascriptControlStructures : true,
-		precompilerSeparator : '\xA3', // '%#@!@#%',
+		precompileSeparator : '\xA3', // '%#@!@#%',
 		variableSeparator: '\xA2',
 		variableSeparatorRe: /\xA2/g,
 		variable : /\{\{\s*(\S+)\s*\}\}/g,
@@ -40,7 +40,7 @@
 		templatePathRe : /^(.*\.html).+$/,
 
 		
-		includeParamsRe  : /include\s+"([^""]+)"((\s+([a-zA-Z0-9_]+)\s*=(\s*([a-zA-Z0-9\.]+)|("[^"]*")|('[^']*')))+)/,
+		includeParamsRe  : /include\s+"([^"]+)"((\s+([a-zA-Z0-9_]+)\s*=(\s*([a-zA-Z0-9\.]+)|("[^"]*")|('[^']*')))+)/,
 		includeParams1Re : /^\s+([a-zA-Z0-9_]+)\s*=(\s*([a-zA-Z0-9\.]+)|("[^"]*")|('[^']*'))/,
 		
 		init : function(params, callback)
@@ -197,7 +197,7 @@
 				    var include_template = m[1];
 				    add_deps(include_template);
 				    // todo parse params
-				    var params_m = this.includeParamsRe(trimmed);
+				    var params_m = this.includeParamsRe.exec(trimmed);
 				    var ctx;
 				    if (params_m)
 				    {
@@ -206,7 +206,7 @@
 				        var params = params_m[2];
 				        while (true)
 				        {
-				            var params_m1 = this.includeParams1Re(params);
+				            var params_m1 = this.includeParams1Re.exec(params);
 				            if (params_m1)
 				            {
 				                params = params.substr(params_m1[0].length);
