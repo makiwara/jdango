@@ -7,7 +7,7 @@
 	<script type="text/javascript" charset="utf-8">
 	(function(){
 		$(function(){
-			$.tpl.init({ url:"../templates/", precompile: [/*templates to precompile*/] }, function(tpl){
+			$.tpl.init({ url:"../sample/templates/", precompile: [/*templates to precompile*/] }, function(tpl){
 				tpl.put('child.html', {template_id:123, amount:10}, '.target')
 			});
 		})
