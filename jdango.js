@@ -1,48 +1,84 @@
-/*  *****************************************
-    *                                       *
-    *       Jdango v.0.4                    *
-    *                                       *
-    ***************************************** */
+/*  ***********************************************
+    *                                             *
+    *       Jdango v.0.4                          *
+    *       http://github.com/makiwara/jdango     * 
+    *                                             *
+    ********************************************* */
     
 try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is required to use with jDango!'); } finally {
 (function($){
-    
-    function alert(w) { console.log(w)}
-    
-    
+
+    /** @private strip whitespace from both ends of string */
 	function trim(s) { return s.replace(/^\s+/, '').replace(/\s+$/, '')}
+    /** @private 100 per cent proof ‘undefined’ value */
 	function undef(s) { return s }
 	
+	/** @namespace jDango template engine singleton */
 	$.tpl = {
+	    /** @private template cache prefix for <script>-based templates */
 		templateQueryPrefix : 'SCRIPT#',
+
+	    /** @private url prefix for HTML templates */
 		templateUrlPrefix : '/static/jdango/templates/',
+		
+	    /** @private url prefix for JS libraries loaded via {% load "smth" %} */
 		libraryUrlPrefix : '/static/jdango/libs/',
+
+	    /** @public is voluntary javascript allowed inside of {%...%} tags?  */
 		javascriptControlStructures : true,
+
+	    /** @private separator which is used to split template in parts of HTML and control structures */
 		precompileSeparator : '\xA3', // '%#@!@#%',
-		variableSeparator: '\xA2',
-		variableSeparatorRe: /\xA2/g,
+
+	    /** @private R.E. for detecting variable substitution   */
 		variable : /\{\{\s*(\S+?)\s*\}\}/g,
+	    /** @private separator helper for process of chunking variables like "styleguide.colors.text" */
+		variableSeparator: '\xA2',
+	    /** @private R.E. for separator helper for process of chunking variables like "styleguide.colors.text" */
+		variableSeparatorRe: /\xA2/g,
+
+	    /** @private R.E. for {% block BLOCKNAME %} construction */
 		blockStart : /block\s+([^ ]+)/,
+	    /** @private R.E. for {% endblock %} construction */
 		blockEnd : /endblock/,
+	    /** @private R.E. for {% extends "templatename" %} construction */
 		extendsRe : /extends\s+"([^""]+)"/,
+	    /** @private R.E. for {% include "templatename" %} construction */
 		includeRe : /include\s+"([^""]+)"/,
+	    /** @private R.E. for {% load "libraryname" %} construction */
         loadRe    : /load\s+"([^""]+)"/,
+	    /** @private R.E. for {% for X in Y %} loop start */
 		forStart : /for\s+([^ ]+)\s+in\s+([^ ]+)/,
+	    /** @private R.E. for {% endfor %} loop end */
 		forEnd : /endfor/,
 
+	    /** @private url prefix for (Lego-)BEM-style blocks */
 		legoBlocksPrefix  : '/static/django/blocks/',
+	    /** @private R.E. to detect BEM-blocks in templatename provided for include/extends */
 		legoBlocksRe      : /^b-([^_\/]*)(_([^_\/]*)_([^\/]*))?(\/.*)?$/,
+	    /** @private R.E. for {{*}} operator */
 		extendsAsteriskRe : /\{\{\*\}\}/g,
 		
+	    /** @private R.E. for {% template templatename %} */
 		templateStart : /template\s+([^ ]+)/,
+	    /** @private R.E. for {% endtemplate %} */
 		templateEnd : /endtemplate/,
+	    /** @private R.E. for inner template detection (and removal) */
 		templateRe  : /\{\%\s*template\s+([^ ]+)\s*\%\}((.|\n)+?)\{\%\s*endtemplate\s*\%\}/,
+	    /** @private R.E. for inner template detection in templatename provided for include/extends */
 		templatePathRe : /^(.*\.html).+$/,
 
-		
+	    /** @private R.E. for include parameters detection */
 		includeParamsRe  : /include\s+"([^"]+)"((\s+([a-zA-Z0-9_]+)\s*=(\s*([a-zA-Z0-9\.]+)|("[^"]*")|('[^']*')))+)/,
+	    /** @private R.E. for detection of a name/value pair for include parameters */
 		includeParams1Re : /^\s+([a-zA-Z0-9_]+)\s*=(\s*([a-zA-Z0-9\.]+)|("[^"]*")|('[^']*'))/,
 		
+	    /** 
+	     * Initializes template engine with given parameters. 
+	     * 
+	     * @param {hash} params Parameters specifying urls: url, lego, libs; precompiled cache: cache; a list of templates to precompile: precompile
+	     * @param {function(tpl)} callback Callback function to call on precompilation completion
+	     */
 		init : function(params, callback)
 		{
 			if (params["cache"] != undef()) this.cache = params["cache"];
@@ -55,6 +91,16 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 			else
 			 	callback(this);
 		},
+
+	    /** 
+	     * Precompiles templates into some javascript code and stores that code in cache.
+	     * Usually you have no need to call this method directly.
+	     * 
+	     * @private
+	     * @param {string[]} templates Names of templates to precompile.
+	     * @param {number} index Number of current template in `templates` queue
+	     * @param {function(tpl)} callback Callback function to call on precompilation completion
+	     */
 		precompile : function(templates, index, callback)
 		{
 			var that = this;
@@ -63,10 +109,29 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 			else
 				this.compile(templates[index], function(){ that.precompile(templates, index+1, callback) });
 		},
+
+	    /** 
+	     * Renders a template with given variable context and puts the result into jQuery target.
+	     * Template is loaded and compiled if necessary.
+	     * 
+	     * @param {string} template Name of a template to render
+	     * @param {hash} ctx Variable context to use with {{var}} substitutions
+	     * @param {string} target String with jQuery-style coordinates of the DOM target, HTML in `$(target)` will be replaced with the result of template render
+	     * @param {function(tpl)} callback Callback function to call on completion of the render
+	     */
 		put : function(template, ctx, target, callback)
 		{
 			this.render(template, ctx, function(result){ $(target).html(result); if (callback) callback() });
 		},
+
+	    /** 
+	     * Renders a template with given variable context and calls the callback function with render result.
+	     * Template is loaded and compiled if necessary.
+	     * 
+	     * @param {string} template Name of a template to render
+	     * @param {hash} ctx Variable context to use with {{var}} substitutions
+	     * @param {function(html)} callback Callback function to call on completion of the render. The result of the render is transferred as the first parameter of function call.
+	     */
 		render : function(template, ctx, callback)
 		{
 			var that = this;
@@ -75,6 +140,14 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 				if (callback) callback(that.cache[template](that, ctx));
 			});
 		},
+
+	    /** 
+	     * Loads and compiles given template into some JavaScript code and stores that code in template cache.
+	     * 
+	     * @private
+	     * @param {string} template Name of a template to render
+	     * @param {function(tpl)} callback Callback function to call on completion of the compilation
+	     */
 		compile : function(template, callback)
 		{
 			if (this.cache[template] != undef()) callback();
@@ -89,6 +162,15 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 			    $.get(path, function(result){ c(result); }, "html");
 			}
 		},
+
+	    /** 
+	     * Compiles content of the given templates into some JavaScript code and store the result in template cache.
+	     * 
+	     * @private
+	     * @param {string} template Name of a template to render
+	     * @param {string} content Raw content of given template
+	     * @param {function(tpl)} callback Callback function to call on completion of the compilation
+	     */
 		compile_content : function(template, content, callback)
 		{
 		    var that = this;
@@ -111,7 +193,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 		    var compile_deps = function(deps)
 		    {
 		        if (deps.length == 0)
-		            that._loadJs(scripts, callback);
+		            that.loadJs(scripts, callback);
 		        else
     		        that.compile(deps[0], function(error) {
         		        if (error) return callback(error);
@@ -195,7 +277,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 				m = this.includeRe.exec(trimmed);
 				if (m)
 				{
-			        this._loadCss([this.expand_path(m[1], this.legoBlocksPrefix, ".css")])
+			        this.loadCss([this.expand_path(m[1], this.legoBlocksPrefix, ".css")])
 				    var include_template = m[1];
 				    add_deps(include_template);
 				    // todo parse params
@@ -247,7 +329,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 			{
 				if (this.cache[parent] == undef()) 
 				{
-			        this._loadCss([this.expand_path(parent, this.legoBlocksPrefix, ".css")])
+			        this.loadCss([this.expand_path(parent, this.legoBlocksPrefix, ".css")])
 					this.compile(parent, function(error){
 						if (error) return callback(error);
 						if (that.cache_eval[parent] == undef()) 
@@ -274,23 +356,44 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 				this.cache_eval[template] = 't = function(tpl, ctx){ /*asterisk*/var __asterisk__="'+template+'";/*endasterisk*/ var _=""; '+c.join(' ')+' return _; }';
 			finalize();
 		},
-		cache : {}, cache_eval : {},
+
+	    /** @private template cache compiled into JavaScript */
+		cache : {}, 
+	    /** @private source version of template cache before JavaScript compilation */
+		cache_eval : {},
 		
-        _css : {},
-		_loadCss : function( urls )
+	    /** @private hash of CSS files already loaded by `.loadCss()` */
+        css : {},
+	    /** 
+	     * Loads CSS files into DOM and stores paths to avoid reoccuring load.
+	     * NB: This method is client-side only!
+	     * 
+	     * @private
+	     * @param {string[]} urls List of paths to CSS files to append them into DOM.
+	     */
+		loadCss : function( urls )
         {
             for (var i=0; i<urls.length; i++)
-                if (!this._css[urls[i]] && urls[i])
+                if (!this.css[urls[i]] && urls[i])
                     {
-                        this._css[urls[i]] = true;
+                        this.css[urls[i]] = true;
                         var newSS=document.createElement('link');
                         newSS.rel='stylesheet';
                         newSS.href=urls[i];
                         document.getElementsByTagName("head")[0].appendChild(newSS);
                     }
         },
+	    /** @private hash of JS files already loaded by `.loadJs()` */
         scripts : {},
-        _loadJs : function( scripts, callback )
+	    /** 
+	     * Loads and runs JS files; stores paths to avoid reoccuring load.
+	     * NB: This method is client-side only though it uses unabstracted `$.getScript` to get and run script contents!
+	     * 
+	     * @private
+	     * @param {string[]} scripts List of paths to JS files to load an run
+	     * @param {function()} callback Callback function to call on load completion
+	     */
+        loadJs : function( scripts, callback )
         {
             var i=0;
             var that = this;
@@ -328,11 +431,20 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
             next();
         },
         
+	    /** 
+	     * Expands paths used in include/extends template tags:
+         * "b-XXX" -> "lego/b-XXX/b-XXX" (with different postfixes provided)
+         * "b-YYY/YYY.js" -> "lego/b-YYY/YYY.js"
+         * "some.html" -> "templates/some.html"
+	     * 
+	     * @private
+	     * @param {string} path Path to expand
+	     * @param {string} default_prefix Default prefix for the case of no substitution required (usually `templates`)
+	     * @param {string} default_postfix Default postfix for the case of standard BEM substitution (`html`, `js` or `css`)
+	     * @returns {string} Expanded version of path
+	     */
         expand_path : function( path, default_prefix, default_postfix )
-        {// this function expands "b-XXX" and "b-XXX/YYY.html" into full path
-            // "b-XXX", ".html" -> "lego/b-XXX/b-XXX"
-            // "b-YYY/YYY.js" -> "lego/b-YYY/YYY.js"
-            // "some.html" -> "templates/some.html"
+        {
 	        var lego_m = this.legoBlocksRe.exec(path);
 	        var result = path;
 	        if (lego_m)
@@ -346,6 +458,22 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 	        else return default_prefix + path;
         },
         
+	    /** 
+	     * Detects, extracts and removes inner templates from given template content.
+	     * For example, content is:
+	     *     Hello 
+	     *     {% template first %} WOW {% endtemplate %}
+	     *     people
+	     *     {% template second %} OMG {% endtemplate %}
+	     * Result is (omitting whitespaces):
+	     *     { content: "Hello people", templates: { first: "WOW", second: "OMG" } }
+	     * 
+	     * @private
+	     * @param {string} content Template content with templates inside.
+	     * @param {string} default_prefix Default prefix for the case of no substitution required (usually `templates`)
+	     * @param {string} default_postfix Default postfix for the case of standard BEM substitution (`html`, `js` or `css`)
+	     * @returns {hash} Hash with `templates` removed from `content` 
+	     */
         remove_templates : function( content )
         {
             var templates = [];
@@ -359,6 +487,24 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
             return { content: content, templates: templates };
         },
         
+	    /** 
+	     * Enhances variable context with key-value pairs.
+	     * This method does nothing with original context, it creates a copy on shallow level.
+	     * This method is called in time of template rendering and used to provide additional parameters while including a template.
+	     *
+	     * @example
+	     * var ctx = { title: "Hello, people", color: "#000" };
+	     * var res = $.tpl.CTX(ctx, { color:"red", font:"Arial" })
+	     * >> console.log(res);
+	     * >> { title: "Hello, people", color: "red", font:"Arial" }
+	     * >> console.log(ctx);
+	     * >> { title: "Hello, people", color: "#000" }
+	     * 
+	     * @private
+	     * @param {hash} ctx Variable context to enhance
+	     * @param {hash} kv Hash of variable to enhance with
+	     * @returns {hash} Enhanced shallow copy of given context
+	     */
         CTX : function( ctx, kv )
         {// this function enhances ctx with kv{keys, values}, where keys means =ctx[keys[k]] 
             var ctx2 = {};
@@ -375,6 +521,6 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
             return ctx2;
         }
         
+        /** Here is the end of the world */
 	};
-	
 })(jQuery); }
