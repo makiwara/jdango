@@ -1,10 +1,10 @@
 /*  *****************************************
     *                                       *
-    *       Jdango v.0.3                    *
+    *       Jdango v.0.4                    *
     *                                       *
     ***************************************** */
-
-
+    
+try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is required to use with jDango!'); } finally {
 (function($){
     
     function alert(w) { console.log(w)}
@@ -377,4 +377,4 @@
         
 	};
 	
-})(jQuery);
+})(jQuery); }
