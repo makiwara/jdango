@@ -143,6 +143,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 
 	    /** 
 	     * Loads and compiles given template into some JavaScript code and stores that code in template cache.
+	     * NB: This method is client-side only because of use of unabstracted `$.get(...)` to load a template.
 	     * 
 	     * @private
 	     * @param {string} template Name of a template to render
@@ -150,11 +151,16 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 	     */
 		compile : function(template, callback)
 		{
-			if (this.cache[template] != undef()) callback();
+		    /** Template is already compiled, there is nothing to do */
+			if (this.cache[template] != undef()) return callback();
+			/** Proceed with compilation */
 			var done = false;
 			var that = this;
+			/** Prepare function snippet to do actual compilation of a content */
 			var c = function(content) { that.compile_content(template, content, callback); }
+			/** Try to compile <script>-embedded template */
 			$(this.templateQueryPrefix+template).each(function(){ done=true; if (!done) c(this.innerHTML); });
+			/** Try to load template from path (expanding it if needed) */
 			if (!done)
 			{
 			    var template = template.replace(that.templatePathRe, '$1');
@@ -173,6 +179,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 	     */
 		compile_content : function(template, content, callback)
 		{
+		    /** Here lies DRAGONS */
 		    var that = this;
 		    // first of all, remove all templates and push them in deps
 		    var inner_templates = this.remove_templates(content);
@@ -506,7 +513,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 	     * @returns {hash} Enhanced shallow copy of given context
 	     */
         CTX : function( ctx, kv )
-        {// this function enhances ctx with kv{keys, values}, where keys means =ctx[keys[k]] 
+        {
             var ctx2 = {};
             for (var k in ctx)
                 ctx2[k] = ctx[k];
