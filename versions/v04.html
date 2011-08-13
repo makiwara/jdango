@@ -2,12 +2,12 @@
 <head>
 	<meta http-equiv="Content-type" content="text/html; charset=utf-8">
 	<title>jdango v.0.4: refactoring, minor fixes, testbed</title>
-	<script type="text/javascript" charset="utf-8" src="jquery.js"></script>
-	<script type="text/javascript" charset="utf-8" src="jdango.js"></script>
+	<script type="text/javascript" charset="utf-8" src="../jquery.js"></script>
+	<script type="text/javascript" charset="utf-8" src="../jdango.js"></script>
 	<script type="text/javascript" charset="utf-8">
 	(function(){
 		$(function(){
-			$.tpl.init({ url:"templates/", libs:"libs/", lego:"blocks/" }, function(tpl){
+			$.tpl.init({ url:"../templates/", libs:"../libs/", lego:"blocks/" }, function(tpl){
 				tpl.put('child.html', {
 				    'template_id':123, 
 				    colors: { text: '#00ff00', bg: '#ffcccc' }, 
