@@ -21,7 +21,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
         add : function(position, input, result, match) {
             result = trim(result);
             input = trim(input);
-            match = trim(match);
+            try { match = trim(match); } catch(e) { match = "NO MATCH PROVIDED" }
             var fail = result != match;
             if (fail) this.fails++;
             var html = [
@@ -29,9 +29,9 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
             fail?"b-test-red b-test-expanded":"",
             '"><div class="hover"><div class="title">№&nbsp;', position, ' — ',
             fail?"problems":"ok!",
-            '</div><table class="w100"><tr><td class="input"><pre>',
+            '</div><table class="w100"><tr><td class="input"><textarea>',
             input.replace(/&/g, '&amp;').replace(/</g, '&lt;'),
-            '</pre></td><td class="result"><div class="b-test-result">',
+            '</textarea></td><td class="result"><div class="b-test-result">',
             result,
             '</div></td></tr><tr><td class="source">HTML rendered from the template<textarea>',
             result.replace(/&/g, '&amp;').replace(/</g, '&lt;'),
@@ -39,7 +39,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
             match.replace(/&/g, '&amp;').replace(/</g, '&lt;'),
             '</textarea></td></tr></table></div></div>'
             ];
-            $('.b-tests').append(html.join(""));
+            $('.b-tests').prepend(html.join(""));
         },
         
         finalize: function(amount) {

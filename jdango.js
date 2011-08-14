@@ -336,8 +336,6 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 			if (parent === false) parent = $(this.templateQueryPrefix+template).attr('parent');
 			if (parent)
 			{
-				if (this.cache[parent] == undef()) 
-				{
 			        this.loadCss([this.expand_path(parent, this.legoBlocksPrefix, ".css")])
 					this.compile(parent, function(error){
 						if (error) return callback(error);
@@ -359,7 +357,6 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 						finalize();
 					});
 					return;
-				}
 			}
 			else
 				this.cache_eval[template] = 't = function(tpl, ctx){ /*asterisk*/var __asterisk__="'+template+'";/*endasterisk*/ var _=""; '+c.join(' ')+' return _; }';
@@ -464,6 +461,8 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 		        var result = this.legoBlocksPrefix + path;
 		        if (!lego_m[5]) 
 		            result += "/" + path + default_postfix;
+		        else
+    	            if (default_postfix == ".css") return false;
 	            return result;
 	        }
 	        if (default_postfix == ".css") return false;
