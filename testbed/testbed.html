@@ -1,0 +1,100 @@
+<html>
+<head>
+	<meta http-equiv="Content-type" content="text/html; charset=utf-8">
+	<title>jDango testbed</title>
+	<script type="text/javascript" charset="utf-8" src="../jquery.js"></script>
+	<script type="text/javascript" charset="utf-8" src="../jdango.js"></script>
+	<script type="text/javascript" charset="utf-8" src="testbed.js"></script>
+	<script type="text/javascript" charset="utf-8">
+	
+	    var test_count = 1;
+	    var test_ctx = {
+	        title:"Jdango testbed title"
+	    };
+	
+	    $(function(){
+	        $('.b-test .title').live('click', function(){
+	           $(this).parent().parent().toggleClass('b-test-expanded');
+	        }).live('mouseover', function(){
+   	           $(this).parent().parent().addClass('b-test-hover');
+   	        }).live('mouseout', function(){
+               $(this).parent().parent().removeClass('b-test-hover');
+            });
+            $.testbed.proceed(test_count, test_ctx);
+	   })
+	</script>
+	<style type="text/css" media="screen">
+	    body { background:#e5e5e5; padding:0; margin:0;}
+        h1 { margin:0; padding:0; font: 21px Arial; color:#999; text-shadow: 0 1px 1px #fff;}
+        h1 a:link, h1 a:visited { color:#444; }
+        h1 a:hover, h1 a:active { color:#000; }
+        .b-info { font: 80% Arial; color:#999; text-shadow: 0 1px 1px #fff; }
+        .b-info .error-yellow { font-weight:bold; 
+            -webkit-border-radius:2px; border-radius:2px;
+            color:rgba(0,0,0,0.33); text-shadow: 0 -1px 1px #ffc;
+            background: #ff0; white-space:nowrap;}
+        .b-info .error-red    { font-weight:bold; 
+            -webkit-border-radius:2px; border-radius:2px;
+            color:#fff; text-shadow: 0 -1px 1px #c00;
+            background: #f00; white-space:nowrap;}
+        .b-head { padding: 10px;
+            background:#f5f5f5;
+            -webkit-box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+        }
+        .b-test { 
+            margin: 5px 0; 
+            padding:5px;
+            font-family:Arial;
+            -webkit-box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+        }
+        td { vertical-align:top;}
+        .b-test .title { margin-left:5px; font-size:80%; color:rgba(0,0,0,0.33); text-shadow: 0 1px 1px #fff;  }
+        .b-test td.input pre { 
+            max-width:400px; overflow:auto;
+            padding:5px;
+            border:1px solid rgba(255,255,255,0.5);
+            background: #f5f5e5;
+        }
+        .b-test-result {
+            max-width:500px; overflow:auto;
+            padding:5px;
+            border:1px solid rgba(255,255,255,0.5);
+            background: #f5f5f5;
+        }
+        .b-test td.match, .b-test td.source { width:400px; 
+            font-size:80%; color:rgba(0,0,0,0.33); text-shadow: 0 1px 1px #fff; }
+        .b-test td.match textarea,
+        .b-test td.source textarea { 
+            width:100%; overflow:auto;
+            padding:5px;
+            height:200px;
+            border:1px solid rgba(255,255,255,0.5);
+            background: #f5f5e5;
+        }
+        .b-test-yellow { background:#ffff00; }
+        .b-test-yellow td.input pre,
+        .b-test-yellow td.source textarea,
+        .b-test-yellow td.match textarea,
+        .b-test-yellow .b-test-result { border-color:#cc0 }
+        .b-test-red { background:#ffcccc; }
+        .b-test-red td.input pre,
+        .b-test-red td.source textarea,
+        .b-test-red td.match textarea,
+        .b-test-red .b-test-result { border-color:#c66 }
+        .b-test table.w100 { display:none;}
+        .b-test-expanded table.w100 { display:inherit; }
+        .b-test .title { cursor:pointer; cursor:hand; }
+        .b-test-hover .hover { margin:-5px; padding:5px; background: rgba(255,255,255,0.33);}
+	</style>
+</head>
+<body>
+    <div class="b-head">
+    	<h1>Testbed &middot; <a href="http://github.com/makiwara/jdango">jDango</a></h1>
+    	<div class="b-info"></div>
+    </div>
+    <div class="b-tests">
+    </div>
+</body>
+</html>
+
+

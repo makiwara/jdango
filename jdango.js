@@ -1,6 +1,6 @@
 /*  ***********************************************
     *                                             *
-    *       Jdango v.0.4                          *
+    *       jDango v.0.4                          *
     *       http://github.com/makiwara/jdango     * 
     *                                             *
     ********************************************* */
@@ -143,6 +143,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 
 	    /** 
 	     * Loads and compiles given template into some JavaScript code and stores that code in template cache.
+	     * Usually you have no need to call this method directly.
 	     * NB: This method is client-side only because of use of unabstracted `$.get(...)` to load a template.
 	     * 
 	     * @private
@@ -171,6 +172,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 
 	    /** 
 	     * Compiles content of the given templates into some JavaScript code and store the result in template cache.
+	     * Usually you have no need to call this method directly.
 	     * 
 	     * @private
 	     * @param {string} template Name of a template to render
@@ -373,6 +375,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
         css : {},
 	    /** 
 	     * Loads CSS files into DOM and stores paths to avoid reoccuring load.
+	     * Usually you have no need to call this method directly.
 	     * NB: This method is client-side only!
 	     * 
 	     * @private
@@ -394,6 +397,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
         scripts : {},
 	    /** 
 	     * Loads and runs JS files; stores paths to avoid reoccuring load.
+	     * Usually you have no need to call this method directly.
 	     * NB: This method is client-side only though it uses unabstracted `$.getScript` to get and run script contents!
 	     * 
 	     * @private
@@ -443,6 +447,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
          * "b-XXX" -> "lego/b-XXX/b-XXX" (with different postfixes provided)
          * "b-YYY/YYY.js" -> "lego/b-YYY/YYY.js"
          * "some.html" -> "templates/some.html"
+	     * Usually you have no need to call this method directly.
 	     * 
 	     * @private
 	     * @param {string} path Path to expand
@@ -467,6 +472,8 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
         
 	    /** 
 	     * Detects, extracts and removes inner templates from given template content.
+	     * Usually you have no need to call this method directly.
+         *
 	     * For example, content is:
 	     *     Hello 
 	     *     {% template first %} WOW {% endtemplate %}
@@ -498,6 +505,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 	     * Enhances variable context with key-value pairs.
 	     * This method does nothing with original context, it creates a copy on shallow level.
 	     * This method is called in time of template rendering and used to provide additional parameters while including a template.
+	     * Usually you have no need to call this method directly even from the inside of a template.
 	     *
 	     * @example
 	     * var ctx = { title: "Hello, people", color: "#000" };
