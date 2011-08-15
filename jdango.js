@@ -32,10 +32,15 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 
 	    /** @private R.E. for detecting variable substitution   */
 		variable : /\{\{\s*(\S+?)\s*\}\}/g,
-	    /** @private separator helper for process of chunking variables like "styleguide.colors.text" */
+	    /** @private separator helper for process of chunking variables like `styleguide.colors.text` */
 		variableSeparator: '\xA2',
-	    /** @private R.E. for separator helper for process of chunking variables like "styleguide.colors.text" */
+	    /** @private R.E. for separator helper for process of chunking variables like `styleguide.colors.text` */
 		variableSeparatorRe: /\xA2/g,
+	    /** @private R.E. for separator helper for process of chunking variables like `styleguide["colors"]`, end part */
+		variableBracketEndRe : /\]\xA2\]/g,
+	    /** @private R.E. for separator helper for process of chunking variables like `styleguide["colors"]`, start part */
+		variableBracketStartRe : /\xA2([^\[\]]+)\[/g,
+		
 
 	    /** @private R.E. for {% block BLOCKNAME %} construction */
 		blockStart : /block\s+([^ ]+)/,
@@ -77,6 +82,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 		commentsDjangoRe : /\{\#(.|\n)*?\#\}/g,
 	    /** @private R.E. for stripping HTML-style <!--..--> comments and whitespace around them */
 		commentsHtmlRe   : /\s*\<\!\-\-(.|\n)*?\-\-\>(\s?)\s*/g,
+		
 		
 	    /** 
 	     * Initializes template engine with given parameters. 
@@ -186,13 +192,24 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 	     */
 		compile_content : function(template, content, callback)
 		{
-		    /** Here lies DRAGONS */
+		    /** Structure with sub-templates extracted from `content`. Handed into `compile_inner`. */
+		    var inner_templates;
+		    /** List of {% include %}-ed templates. Handed into `compile_deps` to precompile those templates. */
+		    var dependancies = [];
+		    /** List of {% load %}-ed script libraries. Used in `compile_deps` to preload those scripts. */
+		    var scripts = [];
+		    /** This-that substitution in order to save this-context. */
 		    var that = this;
-		    // remove comments
-		    content = content.replace(that.commentsDjangoRe, "").replace(that.commentsHtmlRe, "$2");
-		    // first of all, remove all templates and push them in deps
-		    var inner_templates = this.remove_templates(content);
-		    content = inner_templates.content;
+		    /** Name of parent template if this template uses {% extends %} to inherit from another template */
+			var parent = false;
+
+
+		    /** In-place functions for callback-based postprocessing */
+            /**
+             * Compiles all sub-templates found, then launches `compile_deps` to compile other dependancies.
+             * 
+             * @param {hash[]} templates Hash of templates extracted by `this.remove_templates`
+             */
 		    var compile_inner = function(templates)
 		    {
 		        if (templates.length == 0) 
@@ -204,12 +221,19 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
         		        compile_inner(templates);
     		        })
 		    }
-		    var dependancies = [];
-		    var scripts = [];
-		    var compile_deps = function(deps)
+            /**
+             * Compiles all {% include %}-ed templates, then launches `this.loadJs` to preload scripts.
+             * Uses `this.loadCss` to try to load BEM-style css.
+             * 
+             * @param {string[]} deps List of template names to load.
+             */
+		    var compile_deps = function(deps) // TODO hand scripts also.
 		    {
 		        if (deps.length == 0)
+		        {
+    		        that.loadCss([that.expand_path(template, that.legoBlocksPrefix, ".css")]);
 		            that.loadJs(scripts, callback);
+		        }
 		        else
     		        that.compile(deps[0], function(error) {
         		        if (error) return callback(error);
@@ -217,44 +241,98 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
         		        compile_deps(deps);
     		        })
 		    }
+            /**
+             * Oneliner to add an {% include %}-ed template to the dependancies list.
+             * 
+             * @param {string} template Name of template to load.
+             */
 		    var add_deps = function(template) { dependancies[dependancies.length] = template }
+            /**
+             * Finalizes template compilation after the main loop. 
+             * Evaluates template script generated in the main loop and launches `compile_inner` to synchronous finalization of all dependancies.
+             */
 		    var finalize = function()
 		    {
 				that.cache[template] = eval(that.cache_eval[template]); 
 				compile_inner(inner_templates.templates);
 		    }
-			var parent = false;
+
+
+		    /** Main code flow */
+		    
+		    /** Phase I: cleaning template content from comments and sub-templates */
+		    content = content.replace(that.commentsDjangoRe, "").replace(that.commentsHtmlRe, "$2");
+		    inner_templates = this.remove_templates(content);
+		    content = inner_templates.content;
+		    
+		    /** Phase II: bisecting template content into "HTML" and "Control" part.
+		     * "HTML" part will include raw HTML and {{var}} substitutions.
+		     * "Control" part will include pure JavaScript and {% block %}, {% for %}, {% extends %} etc.
+		     * Variable `c` now contains slices of HTML-Control-HTML-Control starting from HTML.
+		     */
 			var c2 = content.replace(/(\{%)|(%})/g, this.precompileSeparator); 
 			var c = c2.split(this.precompileSeparator);
-			// 1. escape 0,2,4,... parts into strings, replacing variables by the way
+
+            /** Phase III: Prepare all the "HTML+{{var}}" parts.
+             * Parts 0,2,4,... should be escaped; {{var}} substitution should be converted into fancy ctx[...]
+             */
 			for (var i=0; i<c.length; i+=2)
 			{
-				// find replaces like {{item.index.key}} -> ctx["item"]["index"]["key"]
+			    /** First of all, convert `{{` and `}}` into "magic symbol".
+			     * Then split HTML part again into "pure HTML" and "variable substitution".
+			     */
 				var t = c[i].replace(this.extendsAsteriskRe, this.variableSeparator+this.variableSeparator)
                             .replace(this.variable, this.variableSeparator+'$1'+this.variableSeparator);
 				t = t.split(this.variableSeparator);
+				/** Now proceed with only "variable substitution" parts, which are odd: 1,3,5,... */
 				for (var j=1; j<t.length; j+=2)
 				{
 				    var replacement;
 				    if (t[j] == "")
+				    {
+				        /** {{*}} is substituted into `__asterisk__` — a special variable 
+				         *  that is set to template name, look at the final stages to clarify 
+				         */
 			            replacement = '__asterisk__';
+			        }
 				    else
 				    {
+				        /** Convert other variable substitution into ctx[var] javascript snippets:
+				         * {{var}}        -> ctx["var"]
+				         * {{var.key}}    -> ctx["var"]["key"]
+				         * {{var["key"]}} -> ctx["var"]["key"]
+				         * {{var[0]}}     -> ctx["var"][0]
+				         * {{var[0].key}} -> ctx["var"][0]["key"]
+				         * and so on.
+				         * NB: There is `variableSeparator` "magic symbol" instead of quotes.
+				         */
 				        t[j] = t[j].replace(/\"|\'/g, this.variableSeparator);
 				        t[j] = t[j].split(".").join(this.variableSeparator+"]["+this.variableSeparator)
 			            replacement = 'ctx['+this.variableSeparator+t[j]+this.variableSeparator+']';
-			            replacement = replacement.replace(/\]\xA2\]/g, "]")
-			            replacement = replacement.replace(/\xA2([^\[\]]+)\[/g, "\xA2$1\xA2][")
+			            replacement = replacement.replace(this.variableBracketEndRe, "]");
+			            replacement = replacement.replace(this.variableBracketStartRe, 
+			                this.variableSeparator+"$1"+this.variableSeparator+"][");
 					}
+					/** Since the default mode is HTML, each substitution is surrounded by quotes and pluses.
+					 *  The result is something like `"+ctx["key"]+"`, which could be glued up back with HTML parts simply.
+					 */
 					t[j] = this.variableSeparator+ "+"+replacement+"+" +this.variableSeparator;
 				}
+				/** Glue up "HTML" and "{{var}}" parts and compose a single line of JavaScript code.
+				 *  There is the variable `_` in the resulting ling. It is used to build the output of the template.
+				 *  As you can see, we now surrounds the resulting line with "magic symbols" and convert all of them into quotes.
+				 *  All other quotes are escaped in order to protect resulting JavaScript.
+				 */
 				c[i] = '_+="'+t.join("").replace(/\\/g, "\\\\").replace(/"/g, "\\\"")
 				        .replace(this.variableSeparatorRe, '"')
 						.replace(/\n/g, "\\n").replace(/\t/g, "\\t").replace(/\r/g, "\\r")+'";';
 			}
-			// 2. detect blocks in 1,3,5,... parts
-			var blockStack=[]; var blockStackSize=0;
-			var blockCache=[];
+			
+			/** Phase IV: Prepare all "Control" parts.
+			 *  Parts 1,3,5,.. should be treated differently depending on their content.
+			 *  HERE IS DRAGONS.
+			 */
+			var blockStack=[]; var blockStackSize=0; var blockCache=[];
 			for (var i=1; i<c.length; i+=2)
 			{
 				var trimmed = trim(c[i]);
@@ -342,35 +420,49 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 				if (!this.javascriptControlStructures)
 					c[i] = '/* {% '+c[i]+' %} */ _+="{! '+c[i].replace(/\\/g, "\\\\").replace(/"/g, "\\\"")+' !}";';
 			}
-			// 3. glue up in function
+			/** Phase III (final): Glue up all resulting JavaScript lines into the single function.
+			 *  If this template claims to be inherited via `{% extends %}` or via `parent` attribute
+			 *  (for <script>-embedded templates), patch function of a parent instead. 
+			 */
 			if (parent === false) parent = $(this.templateQueryPrefix+template).attr('parent');
-			if (parent)
+			if (!parent)
 			{
-			        this.loadCss([this.expand_path(parent, this.legoBlocksPrefix, ".css")])
-					this.compile(parent, function(error){
-						if (error) return callback(error);
-						if (that.cache_eval[parent] == undef()) 
-						{
-							that.cache[template] = function(tpl,ctx){ return "{! inherited from closed source template !}" };
-							return;
-						}
-						that.cache_eval[template] = that.cache_eval[parent];
-						that.cache_eval[template] = that.cache_eval[template].replace(
-						        /\/\*asterisk\*\/(.*?)\/\*endasterisk\*\//, 
-						        '/*asterisk*/var __asterisk__="'+template+'";/*endasterisk*/');
-						for (var i=0; i<blockCache.length; i++)
-						{
-							var bc = blockCache[i];
-							var re = new RegExp("/\\*block "+bc[0]+"\\*/(.|\\n)*/\\*endblock "+bc[0]+"\\*/");
-							that.cache_eval[template] = that.cache_eval[template].replace(re, c.splice(bc[1], bc[2]-bc[1]+1).join(' '));
-						}
-						finalize();
-					});
-					return;
+			    /** If there is no parent, solution is simple:
+			     *  We use `t=function()` construction to browser-proof extraction of `t` value from eval.
+			     *  Function would become JavaScript version of our template and would be put in cache for further use.
+			     *  `tpl` would be `$.tpl` template engine and `ctx` would be variable context for rendering.
+			     *  Here you can see how `asterisk` is converted. 
+			     *  "Magical comments" provide a way to replace of `asterisk` value in case this template is used as parent.
+			     */
+			    this.cache_eval[template] = 't = function(tpl, ctx){ /*asterisk*/var __asterisk__="'+template+'";/*endasterisk*/ var _=""; '+c.join(' ')+' return _; }';
+			    finalize();
+			} 
+			else	
+			{
+			    /** Parent needs to be compiled in order to be used as a base for inheritance. 
+			     *  We then replace all fancy "magical comments" of `block`, `endblock` and `asterisk`
+			     *  with appropriate analogues found in template we've just parsed.
+			     */
+				this.compile(parent, function(error){
+					if (error) return callback(error);
+					if (that.cache_eval[parent] == undef()) 
+					{
+						that.cache[template] = function(tpl,ctx){ return "{! inherited from closed source template !}" };
+						return;
+					}
+					that.cache_eval[template] = that.cache_eval[parent];
+					that.cache_eval[template] = that.cache_eval[template].replace(
+					        /\/\*asterisk\*\/(.*?)\/\*endasterisk\*\//, 
+					        '/*asterisk*/var __asterisk__="'+template+'";/*endasterisk*/');
+					for (var i=0; i<blockCache.length; i++)
+					{
+						var bc = blockCache[i];
+						var re = new RegExp("/\\*block "+bc[0]+"\\*/(.|\\n)*/\\*endblock "+bc[0]+"\\*/");
+						that.cache_eval[template] = that.cache_eval[template].replace(re, c.splice(bc[1], bc[2]-bc[1]+1).join(' '));
+					}
+					finalize();
+				});
 			}
-			else
-				this.cache_eval[template] = 't = function(tpl, ctx){ /*asterisk*/var __asterisk__="'+template+'";/*endasterisk*/ var _=""; '+c.join(' ')+' return _; }';
-			finalize();
 		},
 
 	    /** @private template cache compiled into JavaScript */
