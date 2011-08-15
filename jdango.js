@@ -330,64 +330,78 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 			
 			/** Phase IV: Prepare all "Control" parts.
 			 *  Parts 1,3,5,.. should be treated differently depending on their content.
-			 *  HERE IS DRAGONS.
+			 *  We define an array of control structures: `re` field triggers execution of `action`
 			 */
-			var blockStack=[]; var blockStackSize=0; var blockCache=[];
-			for (var i=1; i<c.length; i+=2)
-			{
-				var trimmed = trim(c[i]);
-				var m;
-				m = this.blockStart.exec(trimmed);
-				if (m)
-				{
-					c[i] = '/*block '+m[1]+'*/';
+			var execs = [
+			  /** {% block XXX %} and {% endblock %}
+			   *  Simply increments/decrements stacksize and provides "magical comments" for further block replacement
+			   *  in case this template would be extended by one another.
+			   *  Also extracts block contents for replacing baseline blocks from parent template
+			   */
+			  { re: this.blockStart,
+			    action: function(m){ 
 					blockStack[blockStackSize++] = [m[1], i];
-					continue;
-				} 
-				m = this.blockEnd.exec(trimmed);
-				if (m)
-				{
-					c[i] = '/*endblock '+blockStack[--blockStackSize][0]+'*/';
+					return '/*block '+m[1]+'*/';
+			    }
+			  },
+			  { re: this.blockEnd,
+			    action: function(m){ 
+			        blockStackSize--;
 					blockCache[blockCache.length] = [blockStack[blockStackSize][0], blockStack[blockStackSize][1], i];
-					continue;
-				} 
-				m = this.forStart.exec(trimmed);
-				if (m)
-				{
-					// TODO add correct subcontexts for cycles
+					return '/*endblock '+blockStack[blockStackSize][0]+'*/';
+			    }
+			  },
+			  /** {% for XXX in YYY %} and {% endfor %}
+			   *  This control structure mimicks original Django `for` loop with several limitations:
+			   *  - none of Django `forloop`-related variables are available;
+			   *  - `for` is implemented via JavaScript `for (var XXX in YYY)`;
+			   *  - variable substitution in YYY is of a very limited support (only xxx.yyy.zzz, no fancy brackets).
+			   */
+			  { re: this.forStart,
+			    action: function(m){ 
+			        /** TODO support all fancy {{var}} substitution. */
 					var unsep = m[2].split(".").join('"]["');
-					c[i] = '/*for */ for (var _foriterator in ctx["'+unsep+'"]) { ctx["'+m[1]+'"] = ctx["'+unsep+'"][_foriterator]; ';
-					continue;
-				} 
-				m = this.forEnd.exec(trimmed);
-				if (m)
-				{
-					c[i] = '/*endfor */ } ';
-					continue;
-				} 
-				m = this.extendsRe.exec(trimmed);
-				if (m)
-				{
-					parent = m[1];
-					continue;
-				} 
-				m = this.includeRe.exec(trimmed);
-				if (m)
-				{
-			        this.loadCss([this.expand_path(m[1], this.legoBlocksPrefix, ".css")])
+					return '/*for */ for (var _foriterator in ctx["'+unsep+'"]) { ctx["'+m[1]+'"] = ctx["'+unsep+'"][_foriterator]; ';
+			    }
+			  },
+			  { re: this.forEnd,
+			    action: function(m){ return '/*endfor */ } '; }
+			  },
+			  /** {% extends "templatename" %}
+			   *  Supports Django-style inheritance; implemented as just remembering the parent for 
+			   *  further use on the final phase of compilation.
+			   */
+			  { re: this.extendsRe,
+			    action: function(m){ 
+			        parent = m[1]; 
+			        return ""; 
+			    }
+			  },
+			  /** {% include "templatename" param=value param=value %}
+			   *  Supports Django-style template inclusion with several limits:
+			   *  - variable substitution for values is of a very limited support (only xxx.yyy.zzz, no fancy brackets).
+			   *    (given there is no parameters in Django includes it is still a gift)
+			   */
+			  { re: this.includeRe,
+			    action: function(m){ 
 				    var include_template = m[1];
-				    add_deps(include_template);
-				    // todo parse params
-				    var params_m = this.includeParamsRe.exec(trimmed);
+			        /** First of all, we will try to load appropriate CSS. If there is not a BEM-block which is included, no import happens. */
+			        that.loadCss([that.expand_path(m[1], that.legoBlocksPrefix, ".css")])
+				    /** Then we will parse all params */
+				    var params_m = that.includeParamsRe.exec(trimmed);
 				    var ctx;
 				    if (params_m)
 				    {
 				        var keys = {};
 				        var values = {};
 				        var params = params_m[2];
+				        /** If any of parameters are detected, we will parse them one by one
+				         *  doing just simple variable substitution.
+				         *  TODO support all fancy {{var}} substitution.
+				         */
 				        while (true)
 				        {
-				            var params_m1 = this.includeParams1Re.exec(params);
+				            var params_m1 = that.includeParams1Re.exec(params);
 				            if (params_m1)
 				            {
 				                params = params.substr(params_m1[0].length);
@@ -398,6 +412,10 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 				            } 
 				            else break;
 				        }
+				        /** Now we will enhance variable context with parameters found.
+				         *  Variable context should be enhanced in runtime during render, not compilation.
+				         *  So we squeeze parameters into line of JavaScript code launching `$.tpl.CTX()` method.
+				         */
 				        var joined_keys = [];
 				        for (var x in keys) joined_keys[joined_keys.length] = x+":"+keys[x];
 				        var joined_values = [];
@@ -405,22 +423,51 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 				        ctx = 'tpl.CTX(ctx, { keys: {'+joined_keys+'}, values:{'+joined_values+'}})';
 				    }
 				    else
+				    {
+				        /** No parameters found — `ctx` goes untouched. */
 				        ctx = 'ctx';
-					c[i] = '_+=tpl.cache["'+include_template+'"](tpl, '+ctx+');';
-					continue;
-				} 
-                m = this.loadRe.exec(trimmed);
-                if (m)
-                {
-                    scripts[scripts.length] = this.expand_path(m[1], this.libraryUrlPrefix, ".js");
-                    c[i] = "";
-                    continue;
-                } 
-				// for not implemented tags - assume it javascript or mark as missed match
-				if (!this.javascriptControlStructures)
+				    }
+				    /** We go directly for cache values omitting `$.tpl.render()` to avoid callback loop.
+				     *  It is safe to do because the template included will be precompiled already.
+				     *  In order to achieve that we add this template as a dependancy.
+				     */ 
+ 				    add_deps(include_template);
+					return '_+=tpl.cache["'+include_template+'"](tpl, '+ctx+');';
+			    }
+			  },
+			  /** {% load "library.js" %} 
+			   *  Supports Django-style JS libraries.
+			   *  Library is loaded in the last phase of compilation, while `finalize()` is executed.
+			   */
+			  { re: that.loadRe,
+			    action: function(m){ 
+                    scripts[scripts.length] = that.expand_path(m[1], that.libraryUrlPrefix, ".js");
+                    return "";
+			    }
+			  },
+			];
+			/** Supplementary variables to help with tracking nested {% block %} structures */
+ 			var blockStack=[]; var blockStackSize=0; var blockCache=[];
+ 			/** Main loop for phase III, which is prretty simple. */
+			for (var i=1; i<c.length; i+=2)
+			{
+				var trimmed = trim(c[i]);
+				var m; var m_done = false;
+				for (var e=0; e<execs.length; e++)
+				{
+				    m = execs[e].re.exec(trimmed);
+				    if (m) 
+				    {
+				        c[i] = execs[e].action(m);
+				        m_done = true;
+				        break;
+				    }
+				}
+				/** If no match was found, we will leave it untouched or screen if scripting is prohibited. */
+				if (!m_done && !this.javascriptControlStructures)
 					c[i] = '/* {% '+c[i]+' %} */ _+="{! '+c[i].replace(/\\/g, "\\\\").replace(/"/g, "\\\"")+' !}";';
 			}
-			/** Phase III (final): Glue up all resulting JavaScript lines into the single function.
+			/** Phase IV (final): Glue up all resulting JavaScript lines into the single function.
 			 *  If this template claims to be inherited via `{% extends %}` or via `parent` attribute
 			 *  (for <script>-embedded templates), patch function of a parent instead. 
 			 */
