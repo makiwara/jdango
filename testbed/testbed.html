@@ -7,6 +7,7 @@
 	<script type="text/javascript" charset="utf-8" src="testbed.js"></script>
 	<script type="text/javascript" charset="utf-8">
 	
+        var test_start = 1;
 	    var test_count = 10000;
 	    var test_ctx = {
 	        title: "Jdango testbed title",
@@ -15,6 +16,11 @@
 	        items: ["first", "second", "third"],
 	        complex_items: [{title:"first"}, {title:"second"}, {title:"third"}],
 	    };
+	    if (location.search != "") 
+	    {
+	        test_start = parseInt(location.search.replace(/^\?/,""),10);
+	        test_count = test_start;
+	    }
 	
 	    $(function(){
 	        $('.b-test .title').live('click', function(){
@@ -27,7 +33,7 @@
             $('.b-head .expand').live('click', function(){
                 $('.b-test').toggleClass('b-test-expanded');
             });
-            $.testbed.proceed(test_count, test_ctx);
+            $.testbed.proceed(test_count, test_ctx, test_start);
 	   })
 	</script>
 	<style type="text/css" media="screen">

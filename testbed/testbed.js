@@ -63,10 +63,10 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
                 });
 		    }, "html");
         },
-        proceed : function(amount, ctx ) {
+        proceed : function(amount, ctx, start ) {
             $.testbed.fails = 0;
 			$.tpl.init( { url:"tests/", libs:"libs/", lego:"blocks/" },
-			            function(){ $.testbed.proceed_one(amount,0, ctx) });
+			            function(){ $.testbed.proceed_one(amount, start-1, ctx) });
         }
         
 	};
