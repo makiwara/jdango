@@ -72,6 +72,11 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 		includeParamsRe  : /include\s+"([^"]+)"((\s+([a-zA-Z0-9_]+)\s*=(\s*([a-zA-Z0-9\.]+)|("[^"]*")|('[^']*')))+)/,
 	    /** @private R.E. for detection of a name/value pair for include parameters */
 		includeParams1Re : /^\s+([a-zA-Z0-9_]+)\s*=(\s*([a-zA-Z0-9\.]+)|("[^"]*")|('[^']*'))/,
+
+	    /** @private R.E. for stripping django-style {#..#} comments */
+		commentsDjangoRe : /\{\#(.|\n)*?\#\}/g,
+	    /** @private R.E. for stripping HTML-style <!--..--> comments and whitespace around them */
+		commentsHtmlRe   : /\s*\<\!\-\-(.|\n)*?\-\-\>(\s?)\s*/g,
 		
 	    /** 
 	     * Initializes template engine with given parameters. 
@@ -183,6 +188,8 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 		{
 		    /** Here lies DRAGONS */
 		    var that = this;
+		    // remove comments
+		    content = content.replace(that.commentsDjangoRe, "").replace(that.commentsHtmlRe, "$2");
 		    // first of all, remove all templates and push them in deps
 		    var inner_templates = this.remove_templates(content);
 		    content = inner_templates.content;
