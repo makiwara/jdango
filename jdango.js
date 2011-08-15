@@ -240,8 +240,11 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 			            replacement = '__asterisk__';
 				    else
 				    {
+				        t[j] = t[j].replace(/\"|\'/g, this.variableSeparator);
+				        t[j] = t[j].split(".").join(this.variableSeparator+"]["+this.variableSeparator)
 			            replacement = 'ctx['+this.variableSeparator+t[j]+this.variableSeparator+']';
-					    replacement = replacement.split(".").join(this.variableSeparator+"]["+this.variableSeparator);
+			            replacement = replacement.replace(/\]\xA2\]/g, "]")
+			            replacement = replacement.replace(/\xA2([^\[\]]+)\[/g, "\xA2$1\xA2][")
 					}
 					t[j] = this.variableSeparator+ "+"+replacement+"+" +this.variableSeparator;
 				}
