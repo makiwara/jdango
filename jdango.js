@@ -347,7 +347,7 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 			  { re: this.blockEnd,
 			    action: function(m){ 
 			        blockStackSize--;
-					blockCache[blockCache.length] = [blockStack[blockStackSize][0], blockStack[blockStackSize][1], i];
+					blockCache[blockCache.length] = [blockStack[blockStackSize][0], blockStack[blockStackSize][1], i ];
 					return '/*endblock '+blockStack[blockStackSize][0]+'*/';
 			    }
 			  },
@@ -505,7 +505,8 @@ try { if (jQuery) ; } catch(e) { alert('Please kindly supply jQuery, it is requi
 					{
 						var bc = blockCache[i];
 						var re = new RegExp("/\\*block "+bc[0]+"\\*/(.|\\n)*/\\*endblock "+bc[0]+"\\*/");
-						that.cache_eval[template] = that.cache_eval[template].replace(re, c.splice(bc[1], bc[2]-bc[1]+1).join(' '));
+						var ct = c.concat([]);
+						that.cache_eval[template] = that.cache_eval[template].replace(re, ct.splice(bc[1], bc[2]-bc[1]+1).join(' '));
 					}
 					finalize();
 				});
